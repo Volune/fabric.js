@@ -7,7 +7,7 @@ fabric.util.object.extend(fabric.IText.prototype, /** @lends fabric.IText.protot
     this.hiddenTextarea = fabric.document.createElement('textarea');
 
     this.hiddenTextarea.setAttribute('autocapitalize', 'off');
-    this.hiddenTextarea.style.cssText = 'position: absolute; opacity: 0; font-size: 0pt;' +
+    this.hiddenTextarea.style.cssText = 'position: absolute; opacity: 0; font-size: 1pt;' +
                                         'color: transparent; z-index: -999;';
     //If at all possible, show the textarea within the canvas wrapper where it can exist
     //at the same height as the iText display. This prevents iOS from scrolling to whatever
@@ -25,7 +25,7 @@ fabric.util.object.extend(fabric.IText.prototype, /** @lends fabric.IText.protot
             xScale = canvasRect.width / this.canvas.width,
             yScale = canvasRect.height / this.canvas.height;
 
-          this.hiddenTextarea.style.top = rect.top * xScale + 'px';
+          this.hiddenTextarea.style.top = (rect.top + rect.height) * xScale + 'px';
           this.hiddenTextarea.style.left = rect.left * yScale + 'px';
           this.hiddenTextarea.style.width = rect.width * xScale + 'px';
           this.hiddenTextarea.style.height = rect.height * yScale + 'px';
