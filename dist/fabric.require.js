@@ -3379,7 +3379,7 @@ if (typeof console !== "undefined") {
     }();
     function parseStyleString(style, oStyle) {
         var attr, value;
-        style.replace(/;$/, "").split(";").forEach(function(chunk) {
+        style.replace(/;\s*$/, "").split(";").forEach(function(chunk) {
             var pair = chunk.split(":");
             attr = normalizeAttr(pair[0].trim().toLowerCase());
             value = normalizeValue(attr, pair[1].trim());
@@ -7604,41 +7604,38 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, {
 })(typeof exports !== "undefined" ? exports : this);
 
 (function() {
-    var degreesToRadians = fabric.util.degreesToRadians;
+    var degreesToRadians = fabric.util.degreesToRadians, originXOffset = {
+        left: -.5,
+        center: 0,
+        right: .5
+    }, originYOffset = {
+        top: -.5,
+        center: 0,
+        bottom: .5
+    };
     fabric.util.object.extend(fabric.Object.prototype, {
-        translateToCenterPoint: function(point, originX, originY) {
-            var cx = point.x, cy = point.y, dim;
-            if (originX !== "center" || originY !== "center") {
+        translateToGivenOrigin: function(point, fromOriginX, fromOriginY, toOriginX, toOriginY) {
+            var x = point.x, y = point.y, offsetX = originXOffset[toOriginX] - originXOffset[fromOriginX], offsetY = originYOffset[toOriginY] - originYOffset[fromOriginY], dim;
+            if (offsetX || offsetY) {
                 dim = this._getTransformedDimensions();
+                x = point.x + offsetX * dim.x;
+                y = point.y + offsetY * dim.y;
             }
-            if (originX === "left") {
-                cx = point.x + dim.x / 2;
-            } else if (originX === "right") {
-                cx = point.x - dim.x / 2;
+            return new fabric.Point(x, y);
+        },
+        translateToCenterPoint: function(point, originX, originY) {
+            var p = this.translateToGivenOrigin(point, originX, originY, "center", "center");
+            if (this.angle) {
+                return fabric.util.rotatePoint(p, point, degreesToRadians(this.angle));
             }
-            if (originY === "top") {
-                cy = point.y + dim.y / 2;
-            } else if (originY === "bottom") {
-                cy = point.y - dim.y / 2;
-            }
-            return fabric.util.rotatePoint(new fabric.Point(cx, cy), point, degreesToRadians(this.angle));
+            return p;
         },
         translateToOriginPoint: function(center, originX, originY) {
-            var x = center.x, y = center.y, dim;
-            if (originX !== "center" || originY !== "center") {
-                dim = this._getTransformedDimensions();
+            var p = this.translateToGivenOrigin(center, "center", "center", originX, originY);
+            if (this.angle) {
+                return fabric.util.rotatePoint(p, center, degreesToRadians(this.angle));
             }
-            if (originX === "left") {
-                x = center.x - dim.x / 2;
-            } else if (originX === "right") {
-                x = center.x + dim.x / 2;
-            }
-            if (originY === "top") {
-                y = center.y - dim.y / 2;
-            } else if (originY === "bottom") {
-                y = center.y + dim.y / 2;
-            }
-            return fabric.util.rotatePoint(new fabric.Point(x, y), center, degreesToRadians(this.angle));
+            return p;
         },
         getCenterPoint: function() {
             var leftTop = new fabric.Point(this.left, this.top);
@@ -7649,30 +7646,17 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, {
             return this.translateToOriginPoint(center, originX, originY);
         },
         toLocalPoint: function(point, originX, originY) {
-            var center = this.getCenterPoint(), x, y, dim;
+            var center = this.getCenterPoint(), p, dim, p2;
             if (originX && originY) {
-                if (originX !== "center" || originY !== "center") {
-                    dim = this._getTransformedDimensions();
-                }
-                if (originX === "left") {
-                    x = center.x - dim.x / 2;
-                } else if (originX === "right") {
-                    x = center.x + dim.x / 2;
-                } else {
-                    x = center.x;
-                }
-                if (originY === "top") {
-                    y = center.y - dim.y / 2;
-                } else if (originY === "bottom") {
-                    y = center.y + dim.y / 2;
-                } else {
-                    y = center.y;
-                }
+                p = this.translateToGivenOrigin(center, "center", "center", originX, originY);
             } else {
-                x = this.left;
-                y = this.top;
+                p = new fabric.Point(this.left, this.top);
             }
-            return fabric.util.rotatePoint(new fabric.Point(point.x, point.y), center, -degreesToRadians(this.angle)).subtractEquals(new fabric.Point(x, y));
+            p2 = new fabric.Point(point.x, point.y);
+            if (this.angle) {
+                p2 = fabric.util.rotatePoint(p2, center, -degreesToRadians(this.angle));
+            }
+            return p2.subtractEquals(p);
         },
         setPositionByOrigin: function(pos, originX, originY) {
             var center = this.translateToCenterPoint(pos, originX, originY), position = this.translateToOriginPoint(center, this.originX, this.originY);
@@ -7681,19 +7665,8 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, {
         },
         adjustPosition: function(to) {
             var angle = degreesToRadians(this.angle), hypotHalf = this.getWidth() / 2, xHalf = Math.cos(angle) * hypotHalf, yHalf = Math.sin(angle) * hypotHalf, hypotFull = this.getWidth(), xFull = Math.cos(angle) * hypotFull, yFull = Math.sin(angle) * hypotFull;
-            if (this.originX === "center" && to === "left" || this.originX === "right" && to === "center") {
-                this.left -= xHalf;
-                this.top -= yHalf;
-            } else if (this.originX === "left" && to === "center" || this.originX === "center" && to === "right") {
-                this.left += xHalf;
-                this.top += yHalf;
-            } else if (this.originX === "left" && to === "right") {
-                this.left += xFull;
-                this.top += yFull;
-            } else if (this.originX === "right" && to === "left") {
-                this.left -= xFull;
-                this.top -= yFull;
-            }
+            this.left += xFull * (originXOffset[to] - originXOffset[this.originX]);
+            this.top += yFull * (originXOffset[to] - originXOffset[this.originX]);
             this.setCoords();
             this.originX = to;
         },
@@ -9600,8 +9573,10 @@ fabric.util.object.extend(fabric.Object.prototype, {
     fabric.Group = fabric.util.createClass(fabric.Object, fabric.Collection, {
         type: "group",
         strokeWidth: 0,
-        initialize: function(objects, options) {
+        initialize: function(objects, options, isAlreadyGrouped) {
             options = options || {};
+            this._objects = [];
+            isAlreadyGrouped && this.callSuper("initialize", options);
             this._objects = objects || [];
             for (var i = this._objects.length; i--; ) {
                 this._objects[i].group = this;
@@ -9613,16 +9588,27 @@ fabric.util.object.extend(fabric.Object.prototype, {
             if (options.originY) {
                 this.originY = options.originY;
             }
-            this._calcBounds();
-            this._updateObjectsCoords();
-            this.callSuper("initialize", options);
+            if (isAlreadyGrouped) {
+                this._updateObjectsCoords(true);
+            } else {
+                this._calcBounds();
+                this._updateObjectsCoords();
+                this.callSuper("initialize", options);
+            }
             this.setCoords();
             this.saveCoords();
         },
-        _updateObjectsCoords: function() {
-            this.forEachObject(this._updateObjectCoords, this);
+        _updateObjectsCoords: function(skipCoordsChange) {
+            for (var i = this._objects.length; i--; ) {
+                this._updateObjectCoords(this._objects[i], skipCoordsChange);
+            }
         },
-        _updateObjectCoords: function(object) {
+        _updateObjectCoords: function(object, skipCoordsChange) {
+            object.__origHasControls = object.hasControls;
+            object.hasControls = false;
+            if (skipCoordsChange) {
+                return;
+            }
             var objectLeft = object.getLeft(), objectTop = object.getTop(), center = this.getCenterPoint();
             object.set({
                 originalLeft: objectLeft,
@@ -9631,8 +9617,6 @@ fabric.util.object.extend(fabric.Object.prototype, {
                 top: objectTop - center.y
             });
             object.setCoords();
-            object.__origHasControls = object.hasControls;
-            object.hasControls = false;
         },
         toString: function() {
             return "#<fabric.Group: (" + this.complexity() + ")>";
@@ -9878,7 +9862,7 @@ fabric.util.object.extend(fabric.Object.prototype, {
     fabric.Group.fromObject = function(object, callback) {
         fabric.util.enlivenObjects(object.objects, function(enlivenedObjects) {
             delete object.objects;
-            callback && callback(new fabric.Group(enlivenedObjects, object));
+            callback && callback(new fabric.Group(enlivenedObjects, object, true));
         });
     };
     fabric.Group.async = true;
@@ -12194,7 +12178,6 @@ fabric.Image.filters.BaseFilter = fabric.util.createClass({
             this.selectionEnd = this.selectionStart;
             this.hiddenTextarea && this.canvas && this.hiddenTextarea.parentNode.removeChild(this.hiddenTextarea);
             this.hiddenTextarea = null;
-            this.latestKeyCode = null;
             this.abortCursorAnimation();
             this._restoreEditingProps();
             this._currentCursorOpacity = 0;
@@ -12224,16 +12207,20 @@ fabric.Image.filters.BaseFilter = fabric.util.createClass({
             this.text = this.text.slice(0, index - 1) + this.text.slice(index);
             this._textLines = this.text.split(this._reNewline);
         },
-        insertChars: function(_chars, useCopiedStyle, noTextareaUpdate) {
-            if (this.selectionEnd - this.selectionStart > 1) {
-                this._removeCharsFromTo(this.selectionStart, this.selectionEnd, noTextareaUpdate);
-                this.setSelectionEnd(this.selectionStart, noTextareaUpdate);
+        insertChars: function(_chars, useCopiedStyle, noTextareaUpdate, range) {
+            var rangeStart, rangeEnd;
+            rangeStart = range ? range.start : this.selectionStart;
+            rangeEnd = range ? range.end : this.selectionEnd;
+            if (rangeStart - rangeEnd > 1) {
+                this._removeCharsFromTo(rangeStart, rangeEnd, noTextareaUpdate);
             }
-            var isEndOfLine = this.text[this.selectionStart] === "\n";
-            this.text = this.text.slice(0, this.selectionStart) + _chars + this.text.slice(this.selectionEnd);
+            var isEndOfLine = this.text[rangeStart] === "\n";
+            this.text = this.text.slice(0, rangeStart) + _chars + this.text.slice(rangeEnd);
             this.insertStyleObjects(_chars, isEndOfLine, useCopiedStyle);
-            this.setSelectionStart(this.selectionStart + _chars.length, noTextareaUpdate);
-            this.setSelectionEnd(this.selectionStart, noTextareaUpdate);
+            if (!range) {
+                this.setSelectionEnd(rangeStart + _chars.length, noTextareaUpdate);
+                this.setSelectionStart(rangeStart + _chars.length, noTextareaUpdate);
+            }
             this.canvas && this.canvas.renderAll();
             this.setCoords();
             this.fire("changed");
@@ -12509,7 +12496,6 @@ fabric.util.object.extend(fabric.IText.prototype, {
             fabric.document.body.appendChild(this.hiddenTextarea);
         }
         fabric.util.addListener(this.hiddenTextarea, "keydown", this.onKeyDown.bind(this));
-        fabric.util.addListener(this.hiddenTextarea, "keypress", this.onKeyPress.bind(this));
         fabric.util.addListener(this.hiddenTextarea, "input", this.onInput.bind(this));
         fabric.util.addListener(this.hiddenTextarea, "copy", this.copy.bind(this));
         fabric.util.addListener(this.hiddenTextarea, "paste", this.paste.bind(this));
@@ -12550,7 +12536,6 @@ fabric.util.object.extend(fabric.IText.prototype, {
         } else if (e.keyCode in this._ctrlKeysMap && (e.ctrlKey || e.metaKey)) {
             this[this._ctrlKeysMap[e.keyCode]](e);
         } else {
-            this.latestKeyCode = e.which;
             return;
         }
         e.stopImmediatePropagation();
@@ -12575,15 +12560,18 @@ fabric.util.object.extend(fabric.IText.prototype, {
         this.copiedStyles = this.getSelectionStyles(this.selectionStart, this.selectionEnd);
     },
     paste: function(e) {
-        var copiedText = null, clipboardData = this._getClipboardData(e);
+        var copiedText = null, clipboardData = this._getClipboardData(e), useCopiedStyle;
         if (clipboardData) {
             copiedText = clipboardData.getData("text");
         } else {
             copiedText = this.copiedText;
+            useCopiedStyle = true;
         }
         if (copiedText) {
-            this.insertChars(copiedText, true);
+            this.insertChars(copiedText, useCopiedStyle);
         }
+        e.stopImmediatePropagation();
+        e.preventDefault();
     },
     cut: function(e) {
         if (this.selectionStart === this.selectionEnd) {
@@ -12595,37 +12583,26 @@ fabric.util.object.extend(fabric.IText.prototype, {
     _getClipboardData: function(e) {
         return e && (e.clipboardData || fabric.window.clipboardData);
     },
-    onKeyPress: function(e) {
-        if (!this.isEditing || e.metaKey || e.ctrlKey) {
-            return;
-        }
-        if (e.which !== 0) {
-            this.insertChars(String.fromCharCode(e.which));
-        }
-        e.stopPropagation();
-    },
     onInput: function() {
-        var newVal = this.hiddenTextarea.value, oldVal = this.text, oLen = oldVal.length, nLen = newVal.length, head, tail, i;
-        if (this._deadKeys.indexOf(this.latestKeyCode) !== -1) {
-            if (newVal.replace(/\ /g, "") === oldVal.replace(/\ /g, "")) {
-                return;
+        var newVal = this.hiddenTextarea.value, oldVal = this.text, oLen = oldVal.length, nLen = newVal.length, selectionStart = this.hiddenTextarea.selectionStart, head, tail, i;
+        for (i = 0; i < selectionStart - 1; i++) {
+            if (newVal[i] !== oldVal[i]) {
+                break;
             }
-            for (i = 0; i < oLen; i++) {
-                if (newVal[i] !== oldVal[i]) {
-                    break;
-                }
-            }
-            head = i;
-            for (i = 1; i <= nLen; i++) {
-                if (newVal[nLen - i] !== oldVal[oLen - i]) {
-                    break;
-                }
-            }
-            tail = i - 1;
-            this.setSelectionStart(head, true);
-            this.setSelectionEnd(oLen - tail, true);
-            this.insertChars(newVal.slice(head, nLen - tail), false, true);
         }
+        head = i;
+        for (i = 1; i <= Math.min(nLen - head, oLen - head); i++) {
+            if (newVal[nLen - i] !== oldVal[oLen - i]) {
+                break;
+            }
+        }
+        tail = i - 1;
+        this.insertChars(newVal.slice(head, nLen - tail), false, true, {
+            start: head,
+            end: oLen - tail
+        });
+        this.setSelectionStart(this.hiddenTextarea.selectionStart, true);
+        this.setSelectionEnd(this.hiddenTextarea.selectionEnd, true);
     },
     getDownCursorOffset: function(e, isRight) {
         var selectionProp = isRight ? this.selectionEnd : this.selectionStart, cursorLocation = this.get2DCursorLocation(selectionProp), _char, lineLeftOffset, lineIndex = cursorLocation.lineIndex, textOnSameLineBeforeCursor = this._textLines[lineIndex].slice(0, cursorLocation.charIndex), textOnSameLineAfterCursor = this._textLines[lineIndex].slice(cursorLocation.charIndex), textOnNextLine = this._textLines[lineIndex + 1] || "";
