@@ -45,7 +45,6 @@ fabric.util.object.extend(fabric.IText.prototype, /** @lends fabric.IText.protot
     }
 
     fabric.util.addListener(this.hiddenTextarea, 'keydown', this.onKeyDown.bind(this));
-    fabric.util.addListener(this.hiddenTextarea, 'keypress', this.onKeyPress.bind(this));
     fabric.util.addListener(this.hiddenTextarea, 'input', this.onInput.bind(this));
     fabric.util.addListener(this.hiddenTextarea, 'copy', this.copy.bind(this));
     fabric.util.addListener(this.hiddenTextarea, 'paste', this.paste.bind(this));
@@ -169,6 +168,7 @@ fabric.util.object.extend(fabric.IText.prototype, /** @lends fabric.IText.protot
     if (copiedText) {
       this.insertChars(copiedText, true);
     }
+    e.stopPropagation();
   },
 
   /**
@@ -194,20 +194,6 @@ fabric.util.object.extend(fabric.IText.prototype, /** @lends fabric.IText.protot
   },
 
   /**
-   * Handles keypress event
-   * @param {Event} e Event object
-   */
-  onKeyPress: function(e) {
-    if (!this.isEditing || e.metaKey || e.ctrlKey) {
-      return;
-    }
-    if (e.which !== 0) {
-      this.insertChars(String.fromCharCode(e.which));
-    }
-    e.stopPropagation();
-  },
-
-  /**
    * Handles input event
    */
   onInput: function() {
@@ -219,36 +205,33 @@ fabric.util.object.extend(fabric.IText.prototype, /** @lends fabric.IText.protot
         tail,
         i;
 
-    //dead key is hit
-    if (this._deadKeys.indexOf(this.latestKeyCode) !== -1) {
-
-      //daed keys will produce unpredictable results
-      //need to scan the whole contents from both begin and end to
-      //extract the changes
-      if (newVal.replace(/\ /g, '') === oldVal.replace(/\ /g, '')) {
-        return;
-      }
-
-      //start
-      for (i = 0; i < oLen; i++) {
-        if (newVal[i] !== oldVal[i]) {
-          break;
-        }
-      }
-      head = i;
-
-      //end
-      for (i = 1; i <= nLen; i++) {
-        if (newVal[nLen - i] !== oldVal[oLen - i]) {
-          break;
-        }
-      }
-      tail = i - 1;
-
-      this.setSelectionStart(head, true);
-      this.setSelectionEnd(oLen - tail, true);
-      this.insertChars(newVal.slice(head, nLen - tail), false, true);
+    //scan the whole contents from both begin and end to
+    //extract the changes
+    if (newVal.replace(/\ /g, '') === oldVal.replace(/\ /g, '')) {
+      return;
     }
+
+    //find 'start', which indicates the **length** of the changed part before
+    //the changes
+    for (i = 0; i < oLen; i++) {
+      if (newVal[i] !== oldVal[i]) {
+        break;
+      }
+    }
+    head = i;
+
+    //find 'tail', which indicates the **length** of the changed part after
+    //the changes
+    for (i = 1; i <= Math.min(nLen - head, oLen - head); i++) {
+      if (newVal[nLen - i] !== oldVal[oLen - i]) {
+        break;
+      }
+    }
+    tail = i - 1;
+
+    this.setSelectionStart(head, true);
+    this.setSelectionEnd(oLen - tail, true);
+    this.insertChars(newVal.slice(head, nLen - tail), false, true);
   },
 
   /**
