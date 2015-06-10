@@ -155,7 +155,8 @@ fabric.util.object.extend(fabric.IText.prototype, /** @lends fabric.IText.protot
    */
   paste: function(e) {
     var copiedText = null,
-        clipboardData = this._getClipboardData(e);
+        clipboardData = this._getClipboardData(e),
+        useCopiedStyle;
 
     // Check for backward compatibility with old browsers
     if (clipboardData) {
@@ -163,10 +164,11 @@ fabric.util.object.extend(fabric.IText.prototype, /** @lends fabric.IText.protot
     }
     else {
       copiedText = this.copiedText;
+      useCopiedStyle = true;
     }
 
     if (copiedText) {
-      this.insertChars(copiedText, true);
+      this.insertChars(copiedText, useCopiedStyle);
     }
     e.stopPropagation();
   },
