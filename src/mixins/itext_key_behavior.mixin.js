@@ -23,12 +23,25 @@ fabric.util.object.extend(fabric.IText.prototype, /** @lends fabric.IText.protot
           // Compute the scale transform between fabric coords and DOM coords
             canvasRect = this.canvas.lowerCanvasEl.getBoundingClientRect(),
             xScale = canvasRect.width / this.canvas.width,
-            yScale = canvasRect.height / this.canvas.height;
+            yScale = canvasRect.height / this.canvas.height,
+            targetX = rect.left * xScale,
+            targetY = (rect.top + rect.height) * yScale,
+            width = rect.width * xScale,
+            height = rect.height * yScale;
 
-          this.hiddenTextarea.style.top = (rect.top + rect.height) * xScale + 'px';
-          this.hiddenTextarea.style.left = rect.left * yScale + 'px';
-          this.hiddenTextarea.style.width = rect.width * xScale + 'px';
-          this.hiddenTextarea.style.height = rect.height * yScale + 'px';
+          if(overflowed()){
+            this.hiddenTextarea.style.top = '0';
+            this.hiddenTextarea.style.left = '0';
+          } else {
+            this.hiddenTextarea.style.top = targetY + 'px';
+            this.hiddenTextarea.style.left = targetX + 'px';
+          }
+
+          this.hiddenTextarea.style.width = width + 'px';
+          this.hiddenTextarea.style.height = height + 'px';
+        }
+        function overflowed () {
+          return ((targetX + width) > canvasRect.width) || ((targetY + height) > canvasRect.height);
         }
       }.bind(this);
 
